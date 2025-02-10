@@ -16,6 +16,7 @@ class User(Base):
     free_messages = Column(Integer, default=10)  # Количество бесплатных сообщений
     has_subscription = Column(Boolean, default=False)  # Флаг подписки
     subscription_expiry = Column(DateTime, nullable=True)  # Дата окончания подписки
+    utm = Column(String, nullable=True) # Метки
 
 
 # Модель хранения истории запросов

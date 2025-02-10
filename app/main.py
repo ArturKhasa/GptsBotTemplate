@@ -71,14 +71,14 @@ async def notify_admin(error_message: str):
 
 
 # Функция проверки или регистрации пользователя
-async def get_or_create_user(tg_user) -> User:
+async def get_or_create_user(tg_user, utm) -> User:
     async with async_session() as session:
         async with session.begin():
             result = await session.execute(select(User).where(User.user_id == tg_user.id))
             user = result.scalars().first()
 
             if not user:
-                user = User(user_id=tg_user.id,full_name=tg_user.first_name, username=tg_user.username, free_messages=FREE_MESSAGES_LIMIT, has_subscription=False)
+                user = User(user_id=tg_user.id,full_name=tg_user.first_name, username=tg_user.username, free_messages=FREE_MESSAGES_LIMIT, has_subscription=False, utm=utm)
                 session.add(user)
                 await session.commit()
 
@@ -142,7 +142,9 @@ async def buy_subscription(user_id: int) -> User:
 # Обработчик команды /start
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
-    await get_or_create_user(message.from_user)
+    args = message.text.split(" ", 1)  # Разбиваем текст команды
+    utm = args[1] if len(args) > 1 else None  # Извлекаем UTM-метку
+    await get_or_create_user(message.from_user, utm)
     # await message.answer(f"👋 Привет, {message.from_user.full_name}! Я ваш помощник по бухгалтерии. Задавайте вопросы!")
     await message.answer(f"Привет, {message.from_user.full_name}! Я — твой виртуальный бухгалтер.👋\n\n"
                          f"Здесь ты можешь получить помощь по бухгалтерским вопросам, рассчитать налоги, узнать сроки сдачи отчётности или получить советы по ведению учёта. В любой момент ты можешь задать мне {FREE_MESSAGES_LIMIT} вопросов, совершенно бесплатно! 🤟\n\n"
