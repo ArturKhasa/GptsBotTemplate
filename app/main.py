@@ -4,11 +4,12 @@ import time
 import logging
 import re
 import asyncio
+from invoice import generate_invoice, get_company_info
 from datetime import datetime, timedelta
 from promting import inicial_start_promt
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, Document, PreCheckoutQuery
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, Document, PreCheckoutQuery, FSInputFile
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ChatAction
 from config import (
@@ -219,6 +220,25 @@ async def cmd_broadcast(message: Message):
     await broadcast_message(text)
     await message.answer("✅ Рассылка завершена!")
 
+@dp.message(Command("invoice"))
+async def send_invoice(message: types.Message):
+    args = message.text.split()
+    if len(args) != 2:
+        await message.answer('Пожалуйста, укажите ИНН компании после команды /invoice. Например "/invoice 1655163150" ')
+        return
+
+    inn = args[1]
+    company_info = await get_company_info(inn)
+
+    if not company_info:
+        await message.answer("❌ Компания не найдена. Проверьте ИНН и попробуйте снова.")
+        return
+
+    await message.answer("📄 Генерация счета...")
+    pdf_path = await generate_invoice(company_info, message.from_user.id)
+    pdf_file = FSInputFile(pdf_path)
+    await message.answer_document(pdf_file, caption="✅ Ваш счет готов! При оплате, в назначении платежа необходимо указать номер счета и дату")
+
 # Обработчик нажатия на кнопку "Купить подписку"
 @dp.callback_query(lambda c: c.data == "buy_subscription")
 async def process_subscription(callback_query: types.CallbackQuery):
@@ -229,8 +249,8 @@ async def process_subscription(callback_query: types.CallbackQuery):
                            provider_token=PAYMENTS_TOKEN,
                            currency="rub",
                            photo_url="https://storage.yandexcloud.net/tgmaps/buh.jpg",
-                           photo_width=1024,
-                           photo_height=1024,
+                           photo_width=2048,
+                           photo_height=2048,
                            # photo_size=416,
                            is_flexible=False,
                            prices=[LabeledPrice(label="Подписка на бота", amount=SUBSCRIPTION_PRICE * 100)],
@@ -264,7 +284,7 @@ async def handle_document(message: Message):
 
     if not await can_user_send_message(user_id):
         keyboard = await get_subscription_button()
-        await message.answer("❌ Ваш лимит бесплатных сообщений исчерпан. Купите подписку, чтобы продолжить.",
+        await message.answer("❌ Ваш лимит бесплатных сообщений исчерпан. Купите подписку, чтобы продолжить. Либо сгенерируйте счет для оплаты через юр.лицо с помощью команды /invoice",
                              reply_markup=keyboard)
         return
 
@@ -294,7 +314,7 @@ async def handle_message(message: Message):
     user_text = message.text
     if not await can_user_send_message(user_id):
         keyboard = await get_subscription_button()
-        await message.answer("❌ Ваш лимит бесплатных сообщений исчерпан. Купите подписку, чтобы продолжить.", reply_markup=keyboard)
+        await message.answer("❌ Ваш лимит бесплатных сообщений исчерпан. Купите подписку, чтобы продолжить. Либо сгенерируйте счет для оплаты через юр.лицо с помощью команды /invoice", reply_markup=keyboard)
         return
 
     # Отправляем эффект "печатает..."

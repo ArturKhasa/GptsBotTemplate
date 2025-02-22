@@ -6,6 +6,7 @@ WORKDIR /app
 
 # Устанавливаем системные зависимости (например, libgomp для faiss)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    wkhtmltopdf \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -21,5 +22,6 @@ COPY ./app /app
 # Открываем порт приложения
 #EXPOSE 5555
 
+ENV WKHTMLTOPDF_PATH=/usr/bin/wkhtmltopdf
 # Запуск приложения
 CMD ["python", "main.py"]

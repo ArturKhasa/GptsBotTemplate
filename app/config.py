@@ -9,6 +9,7 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 PAYMENTS_TOKEN = os.getenv("PAYMENTS_TOKEN")
+DADATA_API_KEY = os.getenv("DADATA_API_KEY")
 SUPPORTED_EXTENSIONS = ["pdf", "txt", "docx", "pptx", "html", "doc"]
 
 # Подключение к PostgreSQL
