@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from promting import inicial_start_promt
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, Document, PreCheckoutQuery, FSInputFile
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, Message, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, Document, PreCheckoutQuery, FSInputFile
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ChatAction
 from config import (
@@ -25,7 +25,17 @@ from config import (
 )
 from database import init_db, ChatHistory, User
 from sqlalchemy.future import select
+# Создаем кнопки
+button1 = KeyboardButton(text="📌 О нас")
+button2 = KeyboardButton(text="📞 Связаться с нами")
+button3 = KeyboardButton(text="📚 Полезные материалы")
+button4 = KeyboardButton(text="📖 Инструкция")
 
+# Создаем клавиатуру
+keyboard = ReplyKeyboardMarkup(
+    keyboard=[[button1], [button2], [button3], [button4]],  # Кнопки передаются списком списков
+    resize_keyboard=True  # Уменьшаем размер клавиатуры
+)
 client = OpenAI(api_key=OPENAI_API_KEY)
 # Инициализация бота с учетом новых изменений в aiogram 3.7+
 bot = Bot(token=TELEGRAM_BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
@@ -199,10 +209,44 @@ async def cmd_start(message: Message):
     args = message.text.split(" ", 1)  # Разбиваем текст команды
     utm = args[1] if len(args) > 1 else None  # Извлекаем UTM-метку
     await get_or_create_user(message.from_user, utm)
-    # await message.answer(f"👋 Привет, {message.from_user.full_name}! Я ваш помощник по бухгалтерии. Задавайте вопросы!")
-    await message.answer(f"Привет, {message.from_user.full_name}! Я — твой виртуальный Консультант.👋\n\n"
-                         f"Здесь ты можешь получить помощь по вопросам в области права, налогообложения и бухгалтерского учета, обученный на материалах КонсультантПлюс. В любой момент ты можешь задать мне {FREE_MESSAGES_LIMIT} вопросов, совершенно бесплатно! 🤟\n\n"
-                         f"Если ты готов начать, просто напиши, что тебе нужно или прикрепи файл для анализа!")
+    await message.answer(f"Здравствуйте, {message.from_user.full_name}! Я — ваш виртуальный Консультант.👋\n\n"
+                         f"Здесь вы можете получить помощь по вопросам в области права, налогообложения и бухгалтерского учета. В любой момент вы можете задать мне {FREE_MESSAGES_LIMIT} вопросов, совершенно бесплатно 🤟\n\n"
+                         f"Если вы готовы начать, просто напишите, что вам нужно или прикрепите файл для анализа", reply_markup=keyboard)
+
+# 📌 О нас
+@dp.message(lambda message: message.text == "📌 О нас")
+async def about_bot(message: types.Message):
+    text = (
+        "🤖 Вот перечень того, что может Консультант:\n\n"
+        "✅ Отвечает на вопросы по налогам и отчетности\n"
+        "✅ Анализирует загруженные файлы\n"
+        "✅ Помогает сдавать отчетность в срок\n"
+        "✅ Уведомляет о важных изменениях\n\n"
+        "📅 Подключите подписку для полного доступа\n"
+        "Если вы хотите сгенерировать счет на оплату для юр.лиц\nИспользуй команду /invoice"
+    )
+    await message.answer(text)
+
+# 📞 Связаться с нами
+@dp.message(lambda message: message.text == "📞 Связаться с нами")
+async def contact_support(message: types.Message):
+    await message.answer("Вы всегда можете связаться через поддержку: @MARINA_HMA")
+
+
+# 📖 Инструкция (пример запроса)
+@dp.message(lambda message: message.text == "📖 Инструкция")
+async def send_instruction(message: types.Message):
+    instruction_text = (
+        "📌 *Пример запроса:*\n\n"
+        "💬 _Как рассчитать налог на прибыль для ИП в 2025 году?_\n\n"
+        "Вы можете задать любые вопросы связанные с бухгалтерией, правом и налогообложением"
+    )
+    await message.answer(instruction_text, parse_mode="MarkdownV2")
+
+# 📚 Полезные материалы (отправка PDF)
+@dp.message(lambda message: message.text == "📚 Полезные материалы")
+async def send_pdf(message: types.Message):
+    await bot.send_document(message.chat.id, FSInputFile("promt.pdf"), caption="📎 Вот полезные материалы, которые позволят более качественно формировать запрос в ИИ")
 
 # Команда для рассылки (только админ)
 @dp.message(Command("broadcast"))
