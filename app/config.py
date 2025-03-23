@@ -21,4 +21,4 @@ async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False
 ADMIN_USER_ID = 316028838
 SUBSCRIPTION_PRICE = 1000
 SUBSCRIPTION_DURATION = 7
-FREE_MESSAGES_LIMIT = 5
+FREE_MESSAGES_LIMIT = 3
