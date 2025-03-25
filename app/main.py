@@ -9,9 +9,9 @@ from datetime import datetime, timedelta
 from promting import inicial_start_promt
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, Message, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, Document, PreCheckoutQuery, FSInputFile
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, Message, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, PreCheckoutQuery, FSInputFile
 from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ChatAction
+from aiogram.enums import ChatType, ChatAction
 from config import (
     OPENAI_API_KEY,
     TELEGRAM_BOT_TOKEN,
@@ -356,6 +356,17 @@ async def handle_document(message: Message):
 async def handle_message(message: Message):
     user_id = message.from_user.id
     user_text = message.text
+    if message.new_chat_members:
+        await bot.send_message(message.chat.id, "Спасибо, что добавили меня в группу! 🎉 Чтобы каждый пользователь мог работать со мной в чате, он должен написать мне в личных сообщениях /start, если до этого не писал. Так же не забудьте подключить груповую подписку!")
+        return
+    if message.left_chat_member:
+        return
+    if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+        if not await can_user_send_message(user_id):
+            await message.answer(f"❌{message.from_user.first_name} Вы не запустили бота или ваш пользователь не включен в подписку. Пожалуйста перейдите в бота и напишите команду /start")
+            return
+    if not user_text:
+        return
     if not await can_user_send_message(user_id):
         keyboard = await get_subscription_button()
         await message.answer("❌ Ваш лимит бесплатных сообщений исчерпан. Купите подписку, чтобы продолжить. Либо сгенерируйте счет для оплаты через юр.лицо с помощью команды /invoice", reply_markup=keyboard)
