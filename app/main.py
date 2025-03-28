@@ -152,7 +152,7 @@ async def get_or_create_user(tg_user, utm) -> User:
 async def broadcast_message(text: str):
     async with async_session() as session:
         async with session.begin():
-            result = await session.execute(select(User.user_id))
+            result = await session.execute(select(User.user_id).where(User.has_subscription == False))
             users = result.scalars().all()
 
             for user_id in users:
