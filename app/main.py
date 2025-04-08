@@ -101,7 +101,7 @@ async def upload_and_analyze_file(file_paths: [], user_query):
 async def chatgpt_response(prompt: str) -> str:
     try:
         sys_prompt = inicial_start_promt()
-        response = client.chat.completions.create(model="gpt-4o-mini",
+        response = client.chat.completions.create(model="gpt-4o",
         messages=[{"role": "system", "content": sys_prompt},
                   {"role": "user", "content": prompt}],
         temperature=0.2)
