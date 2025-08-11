@@ -52,7 +52,7 @@ async def upload_and_analyze_file(file_paths: [], user_query):
     assistant = client.beta.assistants.create(
         name="Эксперт в бухгалтерии",
         instructions=inicial_start_promt(),
-        model="gpt-4o",
+        model="gpt-5",
         tools=[{"type": "file_search"}],
     )
 
@@ -99,13 +99,32 @@ async def upload_and_analyze_file(file_paths: [], user_query):
     return "Не удалось получить ответ от OpenAI."
 
 # Функция запроса к ChatGPT
-async def chatgpt_response(prompt: str) -> str:
+async def chatgpt_response(prompt: str, user_id) -> str:
     try:
         sys_prompt = inicial_start_promt()
-        response = client.chat.completions.create(model="gpt-4o",
-        messages=[{"role": "system", "content": sys_prompt},
-                  {"role": "user", "content": prompt}],
-        temperature=0.2)
+        # Загружаем историю диалога пользователя
+        result = await async_session().execute(
+            select(ChatHistory)
+            .where(ChatHistory.user_id == user_id)
+            .order_by(ChatHistory.timestamp.asc(), ChatHistory.id.asc())
+        )
+        history_rows = result.scalars().all()
+
+        # Формируем messages для ChatGPT
+        messages = [{"role": "system", "content": sys_prompt}]
+        for row in history_rows:
+            messages.append({"role": "user", "content": row.user_message})
+            messages.append({"role": "assistant", "content": row.bot_response})
+
+        # Добавляем новое сообщение
+        messages.append({"role": "user", "content": prompt})
+
+        # Отправляем запрос в модель
+        response = client.chat.completions.create(
+            model="gpt-5",
+            messages=messages
+        )
+
         return response.choices[0].message.content
     except Exception as e:
         logging.error(f"Ошибка OpenAI: {e}")
@@ -384,7 +403,7 @@ async def handle_message(message: Message):
     # Отправляем эффект "печатает..."
     await bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
 
-    response_text = await chatgpt_response(user_text)
+    response_text = await chatgpt_response(user_text, user_id)
     # Сохраняем в базу данных
     await save_message(user_id, user_text, response_text)
     htmlText = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', response_text)
