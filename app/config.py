@@ -19,6 +19,6 @@ async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False
 
 # ID администратора для уведомлений об ошибках
 ADMIN_USER_ID = 316028838
-SUBSCRIPTION_PRICE = 1000
-SUBSCRIPTION_DURATION = 7
-FREE_MESSAGES_LIMIT = 3
+SUBSCRIPTION_PRICE = 1900
+SUBSCRIPTION_DURATION = 30
+FREE_MESSAGES_LIMIT = 1
