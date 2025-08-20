@@ -1,27 +1,24 @@
-# Базовый образ для Python 3.13 (замените на актуальный, если версия изменится)
-FROM python:3.13-slim
+# Более стабильная база с доступным wkhtmltopdf
+FROM python:3.13-slim-bookworm
 
-# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Устанавливаем системные зависимости (например, libgomp для faiss)
+# Системные зависимости
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wkhtmltopdf \
     libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/*
 
-# Копируем и устанавливаем зависимости Python
+# Python-зависимости
 COPY requirements.txt /app/requirements.txt
 COPY .env /app/.env
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+ && pip install --no-cache-dir -r requirements.txt
 
-# Копируем код приложения
+# Код приложения
 COPY ./app /app
 
-# Открываем порт приложения
-#EXPOSE 5555
-
+# Указываем путь (в bookworm это /usr/bin/wkhtmltopdf)
 ENV WKHTMLTOPDF_PATH=/usr/bin/wkhtmltopdf
-# Запуск приложения
+
 CMD ["python", "main.py"]
