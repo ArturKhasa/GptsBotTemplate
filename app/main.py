@@ -205,7 +205,8 @@ async def can_user_send_message(user_id: int) -> bool:
 # Кнопка "Купить подписку"
 async def get_subscription_button():
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"Купить подписку ({SUBSCRIPTION_PRICE} руб на {SUBSCRIPTION_DURATION} дн.)", callback_data="buy_subscription")]
+        [InlineKeyboardButton(text=f"LITE — 990 ₽/мес: лимит 20 запросов/мес, без .docx, урезанные расшифровки", callback_data="buy_subscription_lite")],
+        [InlineKeyboardButton(text=f"PRO — 1 990 ₽/мес: безлимит, полные ответы, .docx-шаблоны", callback_data="buy_subscription_pro")]
     ])
     return keyboard
 
@@ -257,7 +258,7 @@ async def contact_support(message: types.Message):
 async def contact_support(message: types.Message):
     keyboard = await get_subscription_button()
     await message.answer(
-        "⭐ Нажмите на кнопку ниже, чтобы продолжить. Либо сгенерируйте счет для оплаты через юр.лицо с помощью команды /invoice. Если вас интересует подписка на более длительный срок, напишите @MARINA_HMA",
+        "⭐ Нажмите на кнопку ниже, чтобы продолжить. Либо сгенерируйте счет для оплаты через юр.лицо с помощью команды /invoice.\n\nЧтобы ознакомиться со всеми видами подписки для юр.лиц, напишите @MARINA_HMA",
         reply_markup=keyboard)
 
 
@@ -312,12 +313,21 @@ async def send_invoice(message: types.Message):
     await message.answer_document(pdf_file, caption="✅ Ваш счет готов! При оплате, в назначении платежа необходимо указать номер счета и дату")
 
 # Обработчик нажатия на кнопку "Купить подписку"
-@dp.callback_query(lambda c: c.data == "buy_subscription")
+@dp.callback_query(lambda c: c.data == "buy_subscription_lite" or c.data == "buy_subscription_pro")
 async def process_subscription(callback_query: types.CallbackQuery):
+    price = 0
+    description = ''
+    match callback_query.data:
+        case "buy_subscription_lite":
+            price = 990
+            description = 'Lite'
+        case "buy_subscription_pro":
+            price = 1990
+            description = 'Pro'
     user_id = callback_query.from_user.id
     await bot.send_invoice(user_id,
                            title="Подписка на бота",
-                           description=f"БЕЗЛИМИТ на {SUBSCRIPTION_DURATION} дней",
+                           description=f"{description} на {SUBSCRIPTION_DURATION} дней",
                            provider_token=PAYMENTS_TOKEN,
                            currency="rub",
                            photo_url="https://storage.yandexcloud.net/tgmaps/buh.jpg",
@@ -325,7 +335,7 @@ async def process_subscription(callback_query: types.CallbackQuery):
                            photo_height=2048,
                            # photo_size=416,
                            is_flexible=False,
-                           prices=[LabeledPrice(label="Подписка на бота", amount=SUBSCRIPTION_PRICE * 100)],
+                           prices=[LabeledPrice(label="Подписка на бота", amount=price * 100)],
                            start_parameter="one-month-subscription",
                            payload="test-invoice-payload")
 
