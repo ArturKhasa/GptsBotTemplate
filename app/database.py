@@ -1,6 +1,7 @@
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import BigInteger,Column, Integer, String, DateTime, Text, func, Index, Boolean
 from config import engine
+from migrate_once import ensure_subscription_type_pg
 
 # Базовый класс
 class Base(DeclarativeBase):
@@ -17,6 +18,7 @@ class User(Base):
     has_subscription = Column(Boolean, default=False)  # Флаг подписки
     subscription_expiry = Column(DateTime, nullable=True)  # Дата окончания подписки
     utm = Column(String, nullable=True) # Метки
+    subscription_type = Column(String, nullable=True)
 
 
 # Модель хранения истории запросов
@@ -36,5 +38,7 @@ class ChatHistory(Base):
 
 # Создание таблиц
 async def init_db():
+    await ensure_subscription_type_pg(engine)
     async with engine.begin() as conn:
+
         await conn.run_sync(Base.metadata.create_all)

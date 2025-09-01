@@ -4,6 +4,7 @@ import time
 import logging
 import re
 import asyncio
+import subs
 from invoice import generate_invoice, get_company_info
 from datetime import datetime, timedelta
 from promting import inicial_start_promt
@@ -99,13 +100,13 @@ async def upload_and_analyze_file(file_paths: [], user_query):
     return "Не удалось получить ответ от OpenAI."
 
 # Функция запроса к ChatGPT
-async def chatgpt_response(prompt: str, user_id) -> str:
+async def chatgpt_response(prompt: str, from_user) -> str:
     try:
         sys_prompt = inicial_start_promt()
         # Загружаем историю диалога пользователя
         result = await async_session().execute(
             select(ChatHistory)
-            .where(ChatHistory.user_id == user_id)
+            .where(ChatHistory.user_id == from_user.id)
             .order_by(ChatHistory.timestamp.asc(), ChatHistory.id.asc())
         )
         history_rows = result.scalars().all()
@@ -118,10 +119,16 @@ async def chatgpt_response(prompt: str, user_id) -> str:
 
         # Добавляем новое сообщение
         messages.append({"role": "user", "content": prompt})
+        user = await get_or_create_user(from_user)
+
+        if user.subscription_type == 'lite':
+            model = "gpt-5-mini"
+        else:
+            model = "gpt-5"
 
         # Отправляем запрос в модель
         response = client.chat.completions.create(
-            model="gpt-5",
+            model=model,
             messages=messages
         )
 
@@ -155,7 +162,7 @@ async def notify_admin(error_message: str):
 
 
 # Функция проверки или регистрации пользователя
-async def get_or_create_user(tg_user, utm) -> User:
+async def get_or_create_user(tg_user, utm = None) -> User:
     async with async_session() as session:
         async with session.begin():
             result = await session.execute(select(User).where(User.user_id == tg_user.id))
@@ -211,7 +218,7 @@ async def get_subscription_button():
     return keyboard
 
 # Функция покупки подписки
-async def buy_subscription(user_id: int) -> User:
+async def buy_subscription(user_id: int, subscription_type: str) -> User:
     async with async_session() as session:
         async with session.begin():
             result = await session.execute(select(User).where(User.user_id == user_id))
@@ -220,6 +227,7 @@ async def buy_subscription(user_id: int) -> User:
             if user:
                 user.has_subscription = True
                 user.subscription_expiry = datetime.utcnow() + timedelta(days=SUBSCRIPTION_DURATION)
+                user.subscription_type = subscription_type
                 # user.free_messages = FREE_MESSAGES_LIMIT
                 await session.commit()
     return user
@@ -315,19 +323,12 @@ async def send_invoice(message: types.Message):
 # Обработчик нажатия на кнопку "Купить подписку"
 @dp.callback_query(lambda c: c.data == "buy_subscription_lite" or c.data == "buy_subscription_pro")
 async def process_subscription(callback_query: types.CallbackQuery):
-    price = 0
-    description = ''
-    match callback_query.data:
-        case "buy_subscription_lite":
-            price = 990
-            description = 'Lite'
-        case "buy_subscription_pro":
-            price = 1990
-            description = 'Pro'
+    subscription = subs.get_subscription_info(callback_query.data)
+
     user_id = callback_query.from_user.id
     await bot.send_invoice(user_id,
                            title="Подписка на бота",
-                           description=f"{description} на {SUBSCRIPTION_DURATION} дней",
+                           description=f"{subscription.description} на {SUBSCRIPTION_DURATION} дней",
                            provider_token=PAYMENTS_TOKEN,
                            currency="rub",
                            photo_url="https://storage.yandexcloud.net/tgmaps/buh.jpg",
@@ -335,9 +336,9 @@ async def process_subscription(callback_query: types.CallbackQuery):
                            photo_height=2048,
                            # photo_size=416,
                            is_flexible=False,
-                           prices=[LabeledPrice(label="Подписка на бота", amount=price * 100)],
+                           prices=[LabeledPrice(label="Подписка на бота", amount=subscription.price * 100)],
                            start_parameter="one-month-subscription",
-                           payload="test-invoice-payload")
+                           payload=subscription.payload)
 
 # Обработка PreCheckoutQuery
 @dp.pre_checkout_query()
@@ -348,8 +349,8 @@ async def pre_checkout_query_handler(pre_checkout_query: PreCheckoutQuery):
 @dp.message(F.successful_payment)
 async def successful_payment(message: types.Message):
     payment_info = message.successful_payment
-    logging.info(payment_info)
-    user = await buy_subscription(message.chat.id)
+
+    user = await buy_subscription(message.chat.id, payment_info.invoice_payload)
     await bot.send_message(message.chat.id,
                            f"🥳Подписка продлена до {user.subscription_expiry.date()}")
 
@@ -413,7 +414,7 @@ async def handle_message(message: Message):
     # Отправляем эффект "печатает..."
     await bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
 
-    response_text = await chatgpt_response(user_text, user_id)
+    response_text = await chatgpt_response(user_text, message.from_user)
     # Сохраняем в базу данных
     await save_message(user_id, user_text, response_text)
     htmlText = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', response_text)
