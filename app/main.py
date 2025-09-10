@@ -46,6 +46,11 @@ dp = Dispatcher()
 # Логирование
 logging.basicConfig(level=logging.INFO)
 
+async def send_long_message(message: Message, text: str, chunk_size: int = 4000):
+    for i in range(0, len(text), chunk_size):
+        chunk = text[i:i+chunk_size]
+        await message.answer(chunk, parse_mode="HTML")
+
 async def upload_and_analyze_file(file_paths: [], user_query):
     if not user_query:
         user_query = "Проанализируй файл и пришли результаты анализа"
@@ -415,10 +420,12 @@ async def handle_message(message: Message):
     await bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
 
     response_text = await chatgpt_response(user_text, message.from_user)
-    # Сохраняем в базу данных
-    await save_message(user_id, user_text, response_text)
     htmlText = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', response_text)
-    await message.answer(htmlText, parse_mode="HTML")
+    # Сохраняем в базу данных
+    await send_long_message(message, htmlText)
+    await save_message(user_id, user_text, response_text)
+
+    # await message.answer(htmlText, parse_mode="HTML")
 
 
 # Функция запуска бота
