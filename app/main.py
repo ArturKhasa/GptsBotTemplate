@@ -53,7 +53,7 @@ async def upload_and_analyze_file(file_paths: [], user_query):
     assistant = client.beta.assistants.create(
         name="Эксперт в бухгалтерии",
         instructions=inicial_start_promt(),
-        model="gpt-5",
+        model="gpt-5-mini",
         tools=[{"type": "file_search"}],
     )
 
