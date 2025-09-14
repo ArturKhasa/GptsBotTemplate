@@ -132,12 +132,18 @@ async def chatgpt_response(prompt: str, from_user) -> str:
             model = "gpt-5"
 
         # Отправляем запрос в модель
-        response = client.chat.completions.create(
+        # response = client.chat.completions.create(
+        #     model=model,
+        #     messages=messages,
+        # )
+
+        response = client.responses.create(
             model=model,
-            messages=messages
+            tools=[{"type": "web_search"}],
+            input=messages
         )
 
-        return response.choices[0].message.content
+        return response.output_text
     except Exception as e:
         logging.error(f"Ошибка OpenAI: {e}")
         await notify_admin(f"Ошибка OpenAI: {e}")
@@ -417,9 +423,17 @@ async def handle_message(message: Message):
         return
 
     # Отправляем эффект "печатает..."
-    await bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
+    stop_event = asyncio.Event()
+    # запускаем typing в фоне
+    typing_task = asyncio.create_task(send_typing_action(message.chat.id, stop_event))
 
-    response_text = await chatgpt_response(user_text, message.from_user)
+    try:
+        response_text = await chatgpt_response(user_text, message.from_user)
+    finally:
+        # останавливаем typing после завершения
+        stop_event.set()
+        await typing_task
+
     htmlText = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', response_text)
     # Сохраняем в базу данных
     await send_long_message(message, htmlText)
@@ -427,6 +441,14 @@ async def handle_message(message: Message):
 
     # await message.answer(htmlText, parse_mode="HTML")
 
+async def send_typing_action(chat_id: int, stop_event: asyncio.Event):
+    """Фоновая задача: каждые ~5 секунд посылает 'печатает'."""
+    try:
+        while not stop_event.is_set():
+            await bot.send_chat_action(chat_id, ChatAction.TYPING)
+            await asyncio.sleep(5)  # Telegram держит эффект около 5 секунд
+    except asyncio.CancelledError:
+        pass  # аккуратное завершение
 
 # Функция запуска бота
 async def main():
