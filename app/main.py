@@ -423,9 +423,11 @@ async def handle_message(message: Message):
         return
 
     # Отправляем эффект "печатает..."
+    await message.answer("⏳ Ответ может занять некоторое время…")
     await bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
 
     response_text = await chatgpt_response(user_text, message.from_user)
+
     htmlText = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', response_text)
     # Сохраняем в базу данных
     await send_long_message(message, htmlText)
