@@ -118,9 +118,9 @@ async def chatgpt_response(prompt: str, from_user) -> str:
 
         # Формируем messages для ChatGPT
         messages = [{"role": "system", "content": sys_prompt}]
-        for row in history_rows:
-            messages.append({"role": "user", "content": row.user_message})
-            messages.append({"role": "assistant", "content": row.bot_response})
+        # for row in history_rows:
+        #     messages.append({"role": "user", "content": row.user_message})
+        #     messages.append({"role": "assistant", "content": row.bot_response})
 
         # Добавляем новое сообщение
         messages.append({"role": "user", "content": prompt})
