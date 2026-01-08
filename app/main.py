@@ -223,7 +223,7 @@ async def can_user_send_message(user_id: int) -> bool:
 # Кнопка "Купить подписку"
 async def get_subscription_button():
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"Разовый запрос — {subs.get_subscription_info('buy_subscription_lite').price}₽ без .docx, урезанные расшифровки", callback_data="buy_one_time")],
+        [InlineKeyboardButton(text=f"Разовый запрос — {subs.get_subscription_info('buy_one_time').price}₽ без .docx, урезанные расшифровки", callback_data="buy_one_time")],
         [InlineKeyboardButton(text=f"LITE — {subs.get_subscription_info('buy_subscription_lite').price} ₽/мес: лимит 20 запросов/мес, без .docx, урезанные расшифровки", callback_data="buy_subscription_lite")],
         [InlineKeyboardButton(text=f"PRO — {subs.get_subscription_info('buy_subscription_pro').price} ₽/мес: безлимит, полные ответы, .docx-шаблоны", callback_data="buy_subscription_pro")]
     ])
@@ -359,7 +359,7 @@ async def process_subscription(callback_query: types.CallbackQuery):
                            description=description,
                            provider_token=PAYMENTS_TOKEN,
                            currency="rub",
-                           photo_url="https://storage.yandexcloud.net/tgmaps/buh.jpg",
+                           photo_url="https://storage.yandexcloud.net/tgmaps/konsultant.png",
                            photo_width=2048,
                            photo_height=2048,
                            # photo_size=416,
@@ -380,7 +380,7 @@ async def successful_payment(message: types.Message):
 
     user = await buy_subscription(message.chat.id, payment_info.invoice_payload)
     await bot.send_message(message.chat.id,
-                           f"🥳Подписка продлена до {user.subscription_expiry.date()}")
+                           f"🥳Спасибо за покупку! Подписка {user.subscription_type} готова к использованию")
 
 # 🔹 2. Принимаем файлы
 @dp.message(lambda message: message.document)
