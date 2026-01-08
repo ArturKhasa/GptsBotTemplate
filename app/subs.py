@@ -1,13 +1,13 @@
 ACTIVE_SUBSCRIPTIONS = {
     'buy_subscription_lite' : {
         'name': 'Lite',
-        'price' : 990 ,
+        'price' : 1190 ,
         'description' : 'Lite',
         'payload' : 'lite'
     },
     'buy_subscription_pro' : {
         'name': 'Pro',
-        'price': 1990,
+        'price': 2280,
         'description': 'Pro',
         'payload': 'pro'
     },

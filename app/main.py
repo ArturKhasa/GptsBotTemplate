@@ -223,8 +223,8 @@ async def can_user_send_message(user_id: int) -> bool:
 # Кнопка "Купить подписку"
 async def get_subscription_button():
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"LITE — 990 ₽/мес: лимит 20 запросов/мес, без .docx, урезанные расшифровки", callback_data="buy_subscription_lite")],
-        [InlineKeyboardButton(text=f"PRO — 1 990 ₽/мес: безлимит, полные ответы, .docx-шаблоны", callback_data="buy_subscription_pro")]
+        [InlineKeyboardButton(text=f"LITE — {subs.get_subscription_info('buy_subscription_lite')} ₽/мес: лимит 20 запросов/мес, без .docx, урезанные расшифровки", callback_data="buy_subscription_lite")],
+        [InlineKeyboardButton(text=f"PRO — {subs.get_subscription_info('buy_subscription_pro')} ₽/мес: безлимит, полные ответы, .docx-шаблоны", callback_data="buy_subscription_pro")]
     ])
     return keyboard
 
