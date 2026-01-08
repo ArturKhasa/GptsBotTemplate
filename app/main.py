@@ -223,8 +223,9 @@ async def can_user_send_message(user_id: int) -> bool:
 # Кнопка "Купить подписку"
 async def get_subscription_button():
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"LITE — {subs.get_subscription_info('buy_subscription_lite')} ₽/мес: лимит 20 запросов/мес, без .docx, урезанные расшифровки", callback_data="buy_subscription_lite")],
-        [InlineKeyboardButton(text=f"PRO — {subs.get_subscription_info('buy_subscription_pro')} ₽/мес: безлимит, полные ответы, .docx-шаблоны", callback_data="buy_subscription_pro")]
+        [InlineKeyboardButton(text=f"Разовый запрос — {subs.get_subscription_info('buy_subscription_lite').price}₽ без .docx, урезанные расшифровки", callback_data="buy_one_time")],
+        [InlineKeyboardButton(text=f"LITE — {subs.get_subscription_info('buy_subscription_lite').price} ₽/мес: лимит 20 запросов/мес, без .docx, урезанные расшифровки", callback_data="buy_subscription_lite")],
+        [InlineKeyboardButton(text=f"PRO — {subs.get_subscription_info('buy_subscription_pro').price} ₽/мес: безлимит, полные ответы, .docx-шаблоны", callback_data="buy_subscription_pro")]
     ])
     return keyboard
 
@@ -236,10 +237,14 @@ async def buy_subscription(user_id: int, subscription_type: str) -> User:
             user = result.scalars().first()
 
             if user:
-                user.has_subscription = True
-                user.subscription_expiry = datetime.utcnow() + timedelta(days=SUBSCRIPTION_DURATION)
+                if subscription_type == 'one-time':
+                    user.has_subscription = False
+                    user.free_messages = 1
+                else:
+                    user.has_subscription = True
+                    user.subscription_expiry = datetime.utcnow() + timedelta(days=SUBSCRIPTION_DURATION)
+
                 user.subscription_type = subscription_type
-                # user.free_messages = FREE_MESSAGES_LIMIT
                 await session.commit()
     return user
 
@@ -332,14 +337,26 @@ async def send_invoice(message: types.Message):
     await message.answer_document(pdf_file, caption="✅ Ваш счет готов! При оплате, в назначении платежа необходимо указать номер счета и дату")
 
 # Обработчик нажатия на кнопку "Купить подписку"
-@dp.callback_query(lambda c: c.data == "buy_subscription_lite" or c.data == "buy_subscription_pro")
+@dp.callback_query(lambda c: c.data in (
+        "buy_subscription_lite",
+        "buy_subscription_pro",
+        "buy_one_time"
+    ))
 async def process_subscription(callback_query: types.CallbackQuery):
     subscription = subs.get_subscription_info(callback_query.data)
 
     user_id = callback_query.from_user.id
+    # Определяем описание и payload
+    if callback_query.data == "buy_one_time":
+        title = "Разовый доступ к боту"
+        description = subscription.description
+    else:
+        title = "Подписка на бота"
+        description = f"{subscription.description} на {SUBSCRIPTION_DURATION} дней"
+
     await bot.send_invoice(user_id,
-                           title="Подписка на бота",
-                           description=f"{subscription.description} на {SUBSCRIPTION_DURATION} дней",
+                           title=title,
+                           description=description,
                            provider_token=PAYMENTS_TOKEN,
                            currency="rub",
                            photo_url="https://storage.yandexcloud.net/tgmaps/buh.jpg",
@@ -347,7 +364,7 @@ async def process_subscription(callback_query: types.CallbackQuery):
                            photo_height=2048,
                            # photo_size=416,
                            is_flexible=False,
-                           prices=[LabeledPrice(label="Подписка на бота", amount=subscription.price * 100)],
+                           prices=[LabeledPrice(label=title, amount=subscription.price * 100)],
                            start_parameter="one-month-subscription",
                            payload=subscription.payload)
 
@@ -428,7 +445,7 @@ async def handle_message(message: Message):
 
     response_text = await chatgpt_response(user_text, message.from_user)
 
-    htmlText = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', response_text)
+    htmlText = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', response_text).replace("?utm_source=openai", "")
     # Сохраняем в базу данных
     await send_long_message(message, htmlText)
     await save_message(user_id, user_text, response_text)

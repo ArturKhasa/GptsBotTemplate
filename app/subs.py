@@ -11,6 +11,12 @@ ACTIVE_SUBSCRIPTIONS = {
         'description': 'Pro',
         'payload': 'pro'
     },
+    'buy_one_time': {
+        'name': 'Разовый',
+        'price': 300,
+        'description': 'Бот разово ответит на ваш вопрос',
+        'payload': 'one-time'
+    },
 }
 
 class Sub:
