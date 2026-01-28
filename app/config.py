@@ -14,7 +14,12 @@ SUPPORTED_EXTENSIONS = ["pdf", "txt", "docx", "pptx", "html", "doc"]
 
 # Подключение к PostgreSQL
 DATABASE_URL = f"postgresql+asyncpg://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@db/{os.getenv('POSTGRES_DB')}"
-engine = create_async_engine(DATABASE_URL, echo=False)
+engine = create_async_engine(
+    DATABASE_URL,
+    pool_size=20,  # Количество постоянных соединений
+    max_overflow=30,  # Сколько дополнительных соединений можно создать сверх pool_size
+    pool_timeout=60,  # Сколько секунд ждать свободного соединения перед ошибкой
+    echo=False)
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 # ID администратора для уведомлений об ошибках
