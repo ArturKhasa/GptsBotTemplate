@@ -24,6 +24,7 @@ from config import (
 )
 from database import init_db, ChatHistory, User, can_user_send_message
 from sqlalchemy.future import select
+from sender import strip_broadcast, broadcast_send_same_content
 # Создаем кнопки
 button1 = KeyboardButton(text="📌 О нас")
 button2 = KeyboardButton(text="📞 Связаться с нами")
@@ -155,7 +156,7 @@ async def save_message(user_id: int, user_message: str, bot_response: str):
 # Функция для уведомления администратора в Telegram
 async def notify_admin(error_message: str):
     try:
-        await bot.send_message(ADMIN_USER_ID, f"⚠️ Ошибка в боте:\n<pre>{error_message}</pre>")
+        await bot.send_message(ADMIN_USER_ID[0], f"⚠️ Ошибка в боте:\n<pre>{error_message}</pre>")
     except Exception as e:
         logging.error(f"Не удалось отправить сообщение администратору: {e}")
 
@@ -173,19 +174,6 @@ async def get_or_create_user(tg_user, utm = None) -> User:
                 await session.commit()
 
             return user
-
-# Функция рассылки сообщений всем пользователям
-async def broadcast_message(text: str):
-    async with async_session() as session:
-        async with session.begin():
-            result = await session.execute(select(User.user_id).where(User.has_subscription == False))
-            users = result.scalars().all()
-
-            for user_id in users:
-                try:
-                    await bot.send_message(user_id, text)
-                except Exception as e:
-                    logging.error(f"Не удалось отправить сообщение {user_id}: {e}")
 
 
 # Кнопка "Купить подписку"
@@ -270,19 +258,17 @@ async def send_pdf(message: types.Message):
     await bot.send_document(message.chat.id, FSInputFile("promt.pdf"), caption="📎 Вот полезные материалы, которые позволят более качественно формировать запрос в ИИ")
 
 # Команда для рассылки (только админ)
-@dp.message(Command("broadcast"))
-async def cmd_broadcast(message: Message):
-    if message.from_user.id != ADMIN_USER_ID:
-        await message.answer("❌ У вас нет прав на отправку рассылки.")
+@dp.message(
+    (F.text.contains("/broadcast")) | (F.caption.contains("/broadcast"))
+)
+async def broadcast_from_forwarded(message: Message):
+    if F.from_user.id not in ADMIN_USER_ID:
         return
+    raw_text = message.text or message.caption or ""
+    cleaned = strip_broadcast(raw_text)
 
-    text = message.text.replace("/broadcast", "").strip()
-    if not text:
-        await message.answer("❌ Пожалуйста, укажите текст рассылки.")
-        return
-
-    await message.answer(f"✅ Рассылка запущена!")
-    await broadcast_message(text)
+    await message.answer("✅ Рассылка запущена!")
+    await broadcast_send_same_content(message, cleaned)
     await message.answer("✅ Рассылка завершена!")
 
 @dp.message(Command("invoice"))
