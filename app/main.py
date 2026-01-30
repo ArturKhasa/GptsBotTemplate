@@ -1,6 +1,4 @@
 from openai import OpenAI
-import openai
-import time
 import logging
 import re
 import asyncio
@@ -18,13 +16,13 @@ from config import (
     TELEGRAM_BOT_TOKEN,
     async_session,
     ADMIN_USER_ID,
-    SUBSCRIPTION_PRICE,
+    DAILY_LIMIT,
     FREE_MESSAGES_LIMIT,
     PAYMENTS_TOKEN,
     SUBSCRIPTION_DURATION,
     SUPPORTED_EXTENSIONS
 )
-from database import init_db, ChatHistory, User
+from database import init_db, ChatHistory, User, can_user_send_message
 from sqlalchemy.future import select
 # Создаем кнопки
 button1 = KeyboardButton(text="📌 О нас")
@@ -51,58 +49,48 @@ async def send_long_message(message: Message, text: str, chunk_size: int = 4000)
         chunk = text[i:i+chunk_size]
         await message.answer(chunk, parse_mode="HTML")
 
-async def upload_and_analyze_file(file_paths: [], user_query):
+async def upload_and_analyze_file(file_paths: list[str], user_query: str | None):
     if not user_query:
         user_query = "Проанализируй файл и пришли результаты анализа"
 
-    assistant = client.beta.assistants.create(
-        name="Эксперт в бухгалтерии",
-        instructions=inicial_start_promt(),
-        model="gpt-5-mini",
-        tools=[{"type": "file_search"}],
-    )
+    # 1) Создаём vector store и загружаем туда файлы (у вас это уже есть)
+    vector_store = client.vector_stores.create()
 
-    vector_store = client.beta.vector_stores.create()
-    file_streams = [open(path, "rb") for path in file_paths]
-    file_batch = client.beta.vector_stores.file_batches.upload_and_poll(
-        vector_store_id=vector_store.id, files=file_streams
-    )
-    thread = client.beta.threads.create(
-        messages=[
-            {
-                "role": "user",
-                "content": user_query
-            }
-        ]
-    )
+    file_streams = []
+    try:
+        file_streams = [open(path, "rb") for path in file_paths]
 
-    assistant = client.beta.assistants.update(
-        assistant_id=assistant.id,
-        tool_resources={"file_search": {"vector_store_ids": [vector_store.id]}},
-    )
+        client.vector_stores.file_batches.upload_and_poll(
+            vector_store_id=vector_store.id,
+            files=file_streams,
+        )
 
-    # Запускаем задачу
-    run = openai.beta.threads.runs.create(
-        thread_id=thread.id,
-        assistant_id=assistant.id
-    )
-    run_id = run.id
+        # 2) ВОТ ЗДЕСЬ "ВСТАВЛЯЕТСЯ" интернет-поиск:
+        #    вместо assistant/thread/run делаем один вызов Responses API
+        resp = client.responses.create(
+            model="gpt-5",
+            tools=[
+                {"type": "web_search"},
+                {"type": "file_search", "vector_store_ids": [vector_store.id]},
+            ],
+            # если хотите принудительно искать в интернете — раскомментируйте:
+            # tool_choice={"type": "web_search"},
+            input=user_query,
+        )
 
-    # Ожидаем завершения задачи
-    while True:
-        run_status = openai.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run_id)
-        if run_status.status == "completed":
-            break
-        time.sleep(2)
-
-    # Получаем ответ
-    messages = openai.beta.threads.messages.list(thread_id=thread.id)
-    for msg in messages.data:
-        if msg.role == "assistant":
-            client.beta.vector_stores.delete(vector_store_id=vector_store.id)
-            return msg.content[0].text.value
-
-    return "Не удалось получить ответ от OpenAI."
+        return resp.output_text
+    finally:
+        # закрываем файлы
+        for fs in file_streams:
+            try:
+                fs.close()
+            except Exception:
+                pass
+        # чистим vector store
+        try:
+            client.vector_stores.delete(vector_store_id=vector_store.id)
+        except Exception:
+            pass
 
 # Функция запроса к ChatGPT
 async def chatgpt_response(prompt: str, from_user) -> str:
@@ -199,26 +187,6 @@ async def broadcast_message(text: str):
                 except Exception as e:
                     logging.error(f"Не удалось отправить сообщение {user_id}: {e}")
 
-# Проверка на наличие подписки или сокращение лимита
-async def can_user_send_message(user_id: int) -> bool:
-    async with async_session() as session:
-        async with session.begin():
-            result = await session.execute(select(User).where(User.user_id == user_id))
-            user = result.scalars().first()
-
-            if user and user.has_subscription:
-                if user.subscription_expiry <= datetime.now():
-                    user.has_subscription = False
-                    await session.commit()
-                    return False
-                return True  # У подписчика нет ограничений
-
-            if user and user.free_messages > 0:
-                user.free_messages -= 1  # Уменьшаем лимит
-                await session.commit()
-                return True
-
-            return False
 
 # Кнопка "Купить подписку"
 async def get_subscription_button():
@@ -436,7 +404,7 @@ async def handle_message(message: Message):
         return
     if not await can_user_send_message(user_id):
         keyboard = await get_subscription_button()
-        await message.answer("❌ Ваш лимит бесплатных сообщений исчерпан. Купите подписку, чтобы продолжить. Либо сгенерируйте счет для оплаты через юр.лицо с помощью команды /invoice.  Если вас интересует подписка на более длительный срок, напишите @MARINA_HMA", reply_markup=keyboard)
+        await message.answer(f"❌ Ваш лимит бесплатных сообщений исчерпан или вы достигли лимита в {DAILY_LIMIT} сообщений в день. Купите подписку, чтобы продолжить. Либо сгенерируйте счет для оплаты через юр.лицо с помощью команды /invoice.  Если вас интересует подписка на более длительный срок, напишите @MARINA_HMA", reply_markup=keyboard)
         return
 
     # Отправляем эффект "печатает..."

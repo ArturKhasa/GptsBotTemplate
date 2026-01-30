@@ -2,6 +2,12 @@ from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import BigInteger,Column, Integer, String, DateTime, Text, func, Index, Boolean
 from config import engine
 from migrate_once import ensure_subscription_type_pg
+from sqlalchemy import select, func
+from datetime import datetime, timedelta
+from config import (
+    async_session,
+    DAILY_LIMIT
+)
 
 # Базовый класс
 class Base(DeclarativeBase):
@@ -35,6 +41,46 @@ class ChatHistory(Base):
     __table_args__ = (
         Index("idx_user_id", "user_id"),
     )
+
+async def can_user_send_message(user_id: int) -> bool:
+    now_utc = datetime.utcnow()  # ✅ naive UTC
+    start_of_day_utc = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+    next_day_utc = start_of_day_utc + timedelta(days=1)
+
+    async with async_session() as session:
+        async with session.begin():
+            result = await session.execute(select(User).where(User.user_id == user_id))
+            user = result.scalars().first()
+            if not user:
+                return False
+
+            # ✅ суточный лимит для всех (в т.ч. подписчиков)
+            cnt_q = await session.execute(
+                select(func.count(ChatHistory.id)).where(
+                    ChatHistory.user_id == user_id,
+                    ChatHistory.timestamp >= start_of_day_utc,
+                    ChatHistory.timestamp < next_day_utc,
+                )
+            )
+            used_today = cnt_q.scalar_one()
+            if used_today >= DAILY_LIMIT:
+                return False
+
+            # подписка
+            if user.has_subscription:
+                if user.subscription_expiry and user.subscription_expiry <= now_utc:
+                    user.has_subscription = False
+                    await session.commit()
+                    return False
+                return True
+
+            # бесплатные
+            if user.free_messages > 0:
+                user.free_messages -= 1
+                await session.commit()
+                return True
+
+            return False
 
 # Создание таблиц
 async def init_db():
