@@ -370,7 +370,7 @@ async def handle_document(message: Message):
     await save_message(user_id, user_text if user_text else document.file_name, response_text)
     htmlText = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', response_text)
 
-    await message.answer(f"📄 Результат анализа:\n\n{htmlText}", parse_mode="HTML")
+    await send_long_message(message, htmlText)
 
 # Обработчик сообщений
 @dp.message()
