@@ -179,9 +179,9 @@ async def get_or_create_user(tg_user, utm = None) -> User:
 # Кнопка "Купить подписку"
 async def get_subscription_button():
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"Разовый запрос — {subs.get_subscription_info('buy_one_time').price}₽ без .docx, урезанные расшифровки", callback_data="buy_one_time")],
-        [InlineKeyboardButton(text=f"LITE — {subs.get_subscription_info('buy_subscription_lite').price} ₽/мес: лимит 20 запросов/мес, без .docx, урезанные расшифровки", callback_data="buy_subscription_lite")],
-        [InlineKeyboardButton(text=f"PRO — {subs.get_subscription_info('buy_subscription_pro').price} ₽/мес: безлимит, полные ответы, .docx-шаблоны", callback_data="buy_subscription_pro")]
+        [InlineKeyboardButton(text=f"Разовый запрос — {subs.get_subscription_info('buy_one_time').price}₽ без .docx, полные ответы", callback_data="buy_one_time")],
+        [InlineKeyboardButton(text=f"LITE — {subs.get_subscription_info('buy_subscription_lite').price} ₽/мес: ответы на любые вопросы, есть лимит, урезанные расшифровки", callback_data="buy_subscription_lite")],
+        [InlineKeyboardButton(text=f"PRO — {subs.get_subscription_info('buy_subscription_pro').price} ₽/мес: обдумывание каждого вопроса, поиск в интернете, поиск по файлам, есть лимит", callback_data="buy_subscription_pro")]
     ])
     return keyboard
 

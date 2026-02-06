@@ -1,19 +1,19 @@
 ACTIVE_SUBSCRIPTIONS = {
     'buy_subscription_lite' : {
         'name': 'Lite',
-        'price' : 1190 ,
+        'price' : 1990 ,
         'description' : 'Lite',
         'payload' : 'lite'
     },
     'buy_subscription_pro' : {
         'name': 'Pro',
-        'price': 2280,
+        'price': 2980,
         'description': 'Pro',
         'payload': 'pro'
     },
     'buy_one_time': {
         'name': 'Разовый',
-        'price': 300,
+        'price': 350,
         'description': 'Бот разово ответит на ваш вопрос',
         'payload': 'one-time'
     },
