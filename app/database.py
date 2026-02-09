@@ -87,8 +87,7 @@ async def is_user_have_limit(user_id: int) -> bool:
                 )
             )
             used_today = cnt_q.scalar_one()
-            if used_today >= DAILY_LIMIT:
-                return False
+            return used_today <= DAILY_LIMIT
 
 # Создание таблиц
 async def init_db():
