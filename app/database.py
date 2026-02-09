@@ -43,6 +43,7 @@ class ChatHistory(Base):
     )
 
 async def is_user_have_sub(user_id: int) -> bool:
+    now_utc = datetime.utcnow()
     async with async_session() as session:
         async with session.begin():
             result = await session.execute(select(User).where(User.user_id == user_id))
