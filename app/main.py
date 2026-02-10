@@ -9,6 +9,7 @@ from promting import inicial_start_promt
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, Message, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, PreCheckoutQuery, FSInputFile
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ChatType, ChatAction
 from config import (
@@ -16,7 +17,6 @@ from config import (
     TELEGRAM_BOT_TOKEN,
     async_session,
     ADMIN_USER_ID,
-    DAILY_LIMIT,
     FREE_MESSAGES_LIMIT,
     PAYMENTS_TOKEN,
     SUBSCRIPTION_DURATION,
@@ -39,7 +39,8 @@ keyboard = ReplyKeyboardMarkup(
 )
 client = OpenAI(api_key=OPENAI_API_KEY)
 # Инициализация бота с учетом новых изменений в aiogram 3.7+
-bot = Bot(token=TELEGRAM_BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
+session = AiohttpSession(timeout=180)
+bot = Bot(token=TELEGRAM_BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"), session=session)
 dp = Dispatcher()
 
 # Логирование
@@ -98,12 +99,12 @@ async def chatgpt_response(prompt: str, from_user) -> str:
     try:
         sys_prompt = inicial_start_promt()
         # Загружаем историю диалога пользователя
-        result = await async_session().execute(
-            select(ChatHistory)
-            .where(ChatHistory.user_id == from_user.id)
-            .order_by(ChatHistory.timestamp.asc(), ChatHistory.id.asc())
-        )
-        history_rows = result.scalars().all()
+        # result = await async_session().execute(
+        #     select(ChatHistory)
+        #     .where(ChatHistory.user_id == from_user.id)
+        #     .order_by(ChatHistory.timestamp.asc(), ChatHistory.id.asc())
+        # )
+        # history_rows = result.scalars().all()
 
         # Формируем messages для ChatGPT
         messages = [{"role": "system", "content": sys_prompt}]
@@ -115,10 +116,10 @@ async def chatgpt_response(prompt: str, from_user) -> str:
         messages.append({"role": "user", "content": prompt})
         user = await get_or_create_user(from_user)
 
-        if user.subscription_type == 'lite':
-            model = "gpt-5-mini"
-        else:
+        if user.subscription_type == 'pro':
             model = "gpt-5"
+        else:
+            model = "gpt-5-mini"
 
         # Отправляем запрос в модель
         # response = client.chat.completions.create(
@@ -416,7 +417,9 @@ async def handle_message(message: Message):
 
     response_text = await chatgpt_response(user_text, message.from_user)
 
-    htmlText = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', response_text).replace("?utm_source=openai", "")
+    htmlText = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', response_text)
+    htmlText = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2">\1</a>', htmlText)
+    htmlText = htmlText.replace("?utm_source=openai", "")
     # Сохраняем в базу данных
     await send_long_message(message, htmlText)
     await save_message(user_id, user_text, response_text)
