@@ -183,9 +183,9 @@ async def get_or_create_user(tg_user, utm = None) -> User:
 # Кнопка "Купить подписку"
 async def get_subscription_button():
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"Разовый запрос — {subs.get_subscription_info('buy_one_time').price}₽ без .docx, полные ответы", callback_data="buy_one_time")],
-        [InlineKeyboardButton(text=f"LITE — {subs.get_subscription_info('buy_subscription_lite').price} ₽/мес: ответы на любые вопросы, есть лимит, урезанные расшифровки", callback_data="buy_subscription_lite")],
-        [InlineKeyboardButton(text=f"PRO — {subs.get_subscription_info('buy_subscription_pro').price} ₽/мес: обдумывание каждого вопроса, поиск в интернете, поиск по файлам, есть лимит", callback_data="buy_subscription_pro")]
+        [InlineKeyboardButton(text=f"Разовый запрос — {subs.get_subscription_info('buy_one_time').price}₽", callback_data="buy_one_time")],
+        [InlineKeyboardButton(text=f"LITE — {subs.get_subscription_info('buy_subscription_lite').price} ₽/мес: ответы на любые вопросы, урезанные расшифровки", callback_data="buy_subscription_lite")],
+        [InlineKeyboardButton(text=f"PRO — {subs.get_subscription_info('buy_subscription_pro').price} ₽/мес: развернутые ответы, поиск в интернете, поиск по файлам", callback_data="buy_subscription_pro")]
     ])
     return keyboard
 
@@ -364,6 +364,12 @@ async def process_subscription(callback_query: types.CallbackQuery):
                            prices=[LabeledPrice(label=title, amount=subscription.price * 100)],
                            start_parameter="one-month-subscription",
                            payload=subscription.payload)
+    await bot.send_message(
+        user_id,
+        "<i>Оплачивая подписку, вы принимаете условия оферты.</i>\n"
+        "<i><a href=\"https://konsultantgpt.ru/oferta.pdf\">Публичная оферта</a> · "
+        "<a href=\"https://konsultantgpt.ru/politica.pdf\">Политика ПДн</a></i>"
+    )
 
 # Обработка PreCheckoutQuery
 @dp.pre_checkout_query()
@@ -398,6 +404,17 @@ async def handle_document(message: Message):
 
     if not await is_user_have_limit(user_id):
         await message.answer("Ой! Похоже, на сегодня лимит «искр вдохновения» исчерпан. ✨ \nЧтобы сервис работал стабильно для всех, сейчас действует ограничение: 5 запросов в день. \nВаша порция на сегодня подошла к концу, но не грустите — счетчик обновится уже завтра, и мы снова будем на связи!Буду очень ждать вас завтра, чтобы продолжить наше общение. Спасибо, что вы с нами! 🙌")
+        return
+
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.user_id == user_id))
+        user = result.scalars().first()
+    if user and user.subscription_type == "lite":
+        keyboard = await get_subscription_button()
+        await message.answer(
+            "📎 Анализ файлов недоступен на тарифе LITE. Перейдите на PRO, чтобы использовать поиск по файлам.",
+            reply_markup=keyboard
+        )
         return
 
     if file_extension not in SUPPORTED_EXTENSIONS:

@@ -15,6 +15,10 @@ async def ensure_subscription_type_pg(engine):
                 ALTER TABLE "users"
                 ADD COLUMN IF NOT EXISTS "subscription_type" TEXT
             """))
+            await conn.execute(text("""
+                ALTER TABLE "users"
+                ADD COLUMN IF NOT EXISTS "created_at" TIMESTAMP DEFAULT now()
+            """))
         finally:
             await conn.execute(text("SELECT pg_advisory_unlock(:k1, :k2)"),
                                {"k1": MIGRATION_LOCK_KEY_1, "k2": MIGRATION_LOCK_KEY_2})

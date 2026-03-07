@@ -25,6 +25,7 @@ class User(Base):
     subscription_expiry = Column(DateTime, nullable=True)  # Дата окончания подписки
     utm = Column(String, nullable=True) # Метки
     subscription_type = Column(String, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
 
 
 # Модель хранения истории запросов

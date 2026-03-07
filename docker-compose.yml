@@ -5,6 +5,18 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    depends_on:
+      - db
+
+  daily_ping:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "daily_ping.py"]
+    restart: unless-stopped
+    depends_on:
+      - db
+
   db:
     image: postgres:15
     container_name: postgres_db

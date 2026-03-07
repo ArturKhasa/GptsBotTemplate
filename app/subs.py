@@ -2,19 +2,19 @@ ACTIVE_SUBSCRIPTIONS = {
     'buy_subscription_lite' : {
         'name': 'Lite',
         'price' : 1990 ,
-        'description' : 'https://konsultantgpt.ru/oferta.pdf\nhttps://konsultantgpt.ru/politica.pdf',
+        'description' : 'Подпика Lite ответы на любые вопросы, урезанные расшифровки, есть лимит',
         'payload' : 'lite'
     },
     'buy_subscription_pro' : {
         'name': 'Pro',
         'price': 2980,
-        'description': 'https://konsultantgpt.ru/oferta.pdf\nhttps://konsultantgpt.ru/politica.pdf',
+        'description': 'Подпика Pro развернутые ответы, поиск в интернете, поиск по файлам, есть лимит',
         'payload': 'pro'
     },
     'buy_one_time': {
         'name': 'Разовый',
         'price': 350,
-        'description': 'https://konsultantgpt.ru/oferta.pdf\nhttps://konsultantgpt.ru/politica.pdf',
+        'description': 'Разовый доступ к боту',
         'payload': 'one-time'
     },
 }
