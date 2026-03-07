@@ -2,13 +2,15 @@ from openai import OpenAI
 import logging
 import re
 import asyncio
+import csv
+import io
 import subs
 from invoice import generate_invoice, get_company_info
 from datetime import datetime, timedelta
 from promting import inicial_start_promt
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, Message, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, PreCheckoutQuery, FSInputFile
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, Message, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, PreCheckoutQuery, FSInputFile, BufferedInputFile
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ChatType, ChatAction
@@ -24,6 +26,7 @@ from config import (
 )
 from database import init_db, ChatHistory, User, is_user_have_sub, is_user_have_limit
 from sqlalchemy.future import select
+from sqlalchemy import text
 from sender import strip_broadcast, broadcast_send_same_content
 # Создаем кнопки
 button1 = KeyboardButton(text="📌 О нас")
@@ -263,7 +266,7 @@ async def send_pdf(message: types.Message):
     (F.text.contains("/broadcast")) | (F.caption.contains("/broadcast"))
 )
 async def broadcast_from_forwarded(message: Message):
-    if F.from_user.id not in ADMIN_USER_ID:
+    if message.from_user.id not in ADMIN_USER_ID:
         return
     raw_text = message.text or message.caption or ""
     cleaned = strip_broadcast(raw_text)
@@ -271,6 +274,45 @@ async def broadcast_from_forwarded(message: Message):
     await message.answer("✅ Рассылка запущена!")
     await broadcast_send_same_content(message, cleaned)
     await message.answer("✅ Рассылка завершена!")
+
+@dp.message(Command("damp"))
+async def dump_chat_history(message: Message):
+    if message.from_user.id not in ADMIN_USER_ID:
+        await message.answer("⛔ Команда доступна только администратору.")
+        return
+
+    query = text(
+        """
+        select *
+        from chat_history
+        left join public.users u on chat_history.user_id = u.user_id
+        order by timestamp desc
+        """
+    )
+
+    try:
+        async with async_session() as session:
+            result = await session.execute(query)
+            rows = result.mappings().all()
+
+        if not rows:
+            await message.answer("Выгрузка пустая: в таблице chat_history нет данных.")
+            return
+
+        headers = list(rows[0].keys())
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=headers)
+        writer.writeheader()
+        writer.writerows(rows)
+
+        csv_bytes = output.getvalue().encode("utf-8")
+        filename = f"chat_history_dump_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+        document = BufferedInputFile(csv_bytes, filename=filename)
+        await message.answer_document(document, caption=f"✅ Выгрузка готова. Записей: {len(rows)}")
+    except Exception as e:
+        logging.error(f"Ошибка выгрузки /damp: {e}")
+        await notify_admin(f"Ошибка выгрузки /damp: {e}")
+        await message.answer("❌ Не удалось выполнить выгрузку.")
 
 @dp.message(Command("invoice"))
 async def send_invoice(message: types.Message):
