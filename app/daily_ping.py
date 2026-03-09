@@ -98,30 +98,24 @@ async def ping_users_without_subscription() -> tuple[int, int]:
         await bot.session.close()
 
 
-def get_next_ping_time(now: datetime) -> datetime:
-    window_start = now.replace(
+def get_random_ping_time_for_day(day: datetime) -> datetime:
+    window_start = day.replace(
         hour=PING_WINDOW_START_HOUR, minute=0, second=0, microsecond=0
     )
     window_duration_seconds = (PING_WINDOW_END_HOUR - PING_WINDOW_START_HOUR) * 60 * 60
     random_offset = random.randint(0, window_duration_seconds - 1)
-    candidate = window_start + timedelta(seconds=random_offset)
-
-    if candidate <= now:
-        tomorrow = now + timedelta(days=1)
-        window_start = tomorrow.replace(
-            hour=PING_WINDOW_START_HOUR, minute=0, second=0, microsecond=0
-        )
-        random_offset = random.randint(0, window_duration_seconds - 1)
-        candidate = window_start + timedelta(seconds=random_offset)
-
-    return candidate
+    return window_start + timedelta(seconds=random_offset)
 
 
 async def run_daily_ping_loop():
     await init_db()
+    now = datetime.now()
+    next_run = get_random_ping_time_for_day(now)
+    if next_run <= now:
+        next_run = get_random_ping_time_for_day(now + timedelta(days=1))
+
     while True:
         now = datetime.now()
-        next_run = get_next_ping_time(now)
         sleep_seconds = max(0, int((next_run - now).total_seconds()))
         logging.info("Следующий daily ping запланирован на %s", next_run.isoformat())
         await asyncio.sleep(sleep_seconds)
@@ -130,6 +124,8 @@ async def run_daily_ping_loop():
             await ping_users_without_subscription()
         except Exception as exc:
             logging.exception("Критическая ошибка daily ping: %s", exc)
+        finally:
+            next_run = get_random_ping_time_for_day(next_run + timedelta(days=1))
 
 
 if __name__ == "__main__":
