@@ -4,6 +4,7 @@ import re
 import asyncio
 import csv
 import io
+from html import escape as html_escape
 import subs
 from invoice import generate_invoice, get_company_info
 from datetime import datetime, timedelta
@@ -49,10 +50,19 @@ dp = Dispatcher()
 # Логирование
 logging.basicConfig(level=logging.INFO)
 
+def format_model_text_to_html(text: str) -> str:
+    # Экранируем потенциально опасный HTML из модели/пользователя
+    safe_text = html_escape(text)
+    # Поддерживаем базовое форматирование markdown в ответах модели
+    safe_text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", safe_text, flags=re.DOTALL)
+    safe_text = re.sub(r"\[(.+?)\]\((https?://[^\s)]+)\)", r'<a href="\2">\1</a>', safe_text)
+    return safe_text.replace("?utm_source=openai", "")
+
+
 async def send_long_message(message: Message, text: str, chunk_size: int = 4000):
     for i in range(0, len(text), chunk_size):
         chunk = text[i:i+chunk_size]
-        await message.answer(chunk, parse_mode="HTML")
+        await message.answer(format_model_text_to_html(chunk), parse_mode="HTML")
 
 async def upload_and_analyze_file(file_paths: list[str], user_query: str | None):
     if not user_query:
@@ -160,7 +170,7 @@ async def save_message(user_id: int, user_message: str, bot_response: str):
 # Функция для уведомления администратора в Telegram
 async def notify_admin(error_message: str):
     try:
-        await bot.send_message(ADMIN_USER_ID[0], f"⚠️ Ошибка в боте:\n<pre>{error_message}</pre>")
+        await bot.send_message(ADMIN_USER_ID[0], f"⚠️ Ошибка в боте:\n<pre>{html_escape(error_message)}</pre>")
     except Exception as e:
         logging.error(f"Не удалось отправить сообщение администратору: {e}")
 
@@ -432,9 +442,7 @@ async def handle_document(message: Message):
     response_text = await upload_and_analyze_file([document.file_name], user_text)
     # Сохраняем в базу данных
     await save_message(user_id, user_text if user_text else document.file_name, response_text)
-    htmlText = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', response_text)
-
-    await send_long_message(message, htmlText)
+    await send_long_message(message, response_text)
 
 # Обработчик сообщений
 @dp.message()
@@ -476,11 +484,8 @@ async def handle_message(message: Message):
 
     response_text = await chatgpt_response(user_text, message.from_user)
 
-    htmlText = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', response_text)
-    htmlText = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2">\1</a>', htmlText)
-    htmlText = htmlText.replace("?utm_source=openai", "")
     # Сохраняем в базу данных
-    await send_long_message(message, htmlText)
+    await send_long_message(message, response_text)
     await save_message(user_id, user_text, response_text)
 
     # await message.answer(htmlText, parse_mode="HTML")
