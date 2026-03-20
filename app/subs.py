@@ -1,13 +1,13 @@
 ACTIVE_SUBSCRIPTIONS = {
     'buy_subscription_lite' : {
         'name': 'Lite',
-        'price' : 1990 ,
+        'price' : 2990 ,
         'description' : 'Подпика Lite ответы на любые вопросы, урезанные расшифровки, есть лимит',
         'payload' : 'lite'
     },
     'buy_subscription_pro' : {
         'name': 'Pro',
-        'price': 2980,
+        'price': 3980,
         'description': 'Подпика Pro развернутые ответы, поиск в интернете, поиск по файлам, есть лимит',
         'payload': 'pro'
     },
